@@ -1,41 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-====================================================================================================
-Página inicial do aplicativo
-Método Marcatili - Análise de Guias de Onda Ópticos
+================================================================================
+ Marcatili-Kawano Analyzer - Análise Modal segundo Kawano & Kitoh (2001)
+ Baseado exclusivamente nas equações do método de Marcatili com cinco regiões.
 
-Este programa foi desenvolvido para auxiliar na elaboração do relatório analítico e 
-fornecerá cálculos e representações gráficas da distribuição do campo elétrico 
-para guias de onda ópticos retangulares utilizando o método Marcatili.
-
-Bibliografia
-INTRODUÇÃO À ANÁLISE DE GUIAS DE ONDA ÓPTICOS - Resolução das Equações de Maxwell e da Equação de Schrödinger
-FOTÔNICA INTEGRADA: FUNDAMENTOS - Ginés Lifante
-
-Inspiração do projeto
-App_Marcatili_Analysis - MatLab R2025b
-
-Data: 13/04/2026
-====================================================================================================
+Data: 19/05/2026
+================================================================================
 """
 
 import sys
 import os
 
-# Add the current directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from views.marcatili_gui import MarcatiliGUI
+from views.marcatili_gui import MarcatiliKawanoGUI
 
-def main():    
+
+def main():
     print("=" * 70)
-    print("  MÉTODO DE MARCATILI - ANÁLISE DE GUIAS DE ONDA ÓPTICOS")
+    print("  MARCATILI-KAWANO ANALYZER (versão com 5 regiões)")
+    print("  Baseado em Kawano & Kitoh (2001) - Seção 2.3")
     print("=" * 70)
     print("  Iniciando aplicação...")
     print("=" * 70)
-    
-    app = MarcatiliGUI()
+
+    app = MarcatiliKawanoGUI()
     app.run()
 
 

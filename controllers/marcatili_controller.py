@@ -5,7 +5,12 @@ Data: 19/05/2026
 """
 
 from typing import Optional, Callable
-from models.waveguide import WaveguideParameters, WaveguideModel, Polarization, WaveguideResults
+from models.waveguide import (
+    WaveguideParameters,
+    WaveguideModel,
+    Polarization,
+    WaveguideResults,
+)
 
 
 class MarcatiliController:
@@ -22,19 +27,37 @@ class MarcatiliController:
         for cb in self._observers:
             cb()
 
-    def set_parameters(self, width_um: float, height_um: float, wavelength_um: float,
-                       n1: float, n2: float, n3: float, n4: float, n5: float,
-                       mode_x: int, mode_y: int, polarization: int,
-                       resolution: int, extension: float) -> bool:
+    def set_parameters(
+        self,
+        width_um: float,
+        height_um: float,
+        wavelength_um: float,
+        n1: float,
+        n2: float,
+        n3: float,
+        n4: float,
+        n5: float,
+        mode_x: int,
+        mode_y: int,
+        polarization: int,
+        resolution: int,
+        extension: float,
+    ) -> bool:
         try:
             self._params = WaveguideParameters(
                 width=width_um * 1e-6,
                 height=height_um * 1e-6,
                 wavelength=wavelength_um * 1e-6,
-                n1=n1, n2=n2, n3=n3, n4=n4, n5=n5,
-                mode_x=mode_x, mode_y=mode_y,
+                n1=n1,
+                n2=n2,
+                n3=n3,
+                n4=n4,
+                n5=n5,
+                mode_x=mode_x,
+                mode_y=mode_y,
                 polarization=Polarization.TE if polarization == 1 else Polarization.TM,
-                resolution=resolution, extension=extension
+                resolution=resolution,
+                extension=extension,
             )
             self._notify_observers()
             return True

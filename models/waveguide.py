@@ -12,24 +12,24 @@ from enum import Enum
 
 
 class Polarization(Enum):
-    TE = 1   # E_x (quasi-TM na notação de Kawano)
-    TM = 2   # E_y (quasi-TE)
+    TE = 1  # E_x (quasi-TM na notação de Kawano)
+    TM = 2  # E_y (quasi-TE)
 
 
 @dataclass
 class WaveguideParameters:
     # Dimensões
-    width: float = 4e-6          # 2a (m)
-    height: float = 4e-6         # 2b (m)
+    width: float = 4e-6  # 2a (m)
+    height: float = 4e-6  # 2b (m)
     wavelength: float = 1.55e-6  # λ (m)
-    
+
     # Índices das 5 regiões (Kawano Fig. 2.3)
-    n1: float = 1.5              # núcleo
-    n2: float = 1.0              # revestimento superior (cover)
-    n3: float = 1.45             # revestimento direito
-    n4: float = 1.45             # revestimento inferior
-    n5: float = 1.45             # revestimento esquerdo
-    
+    n1: float = 1.5  # núcleo
+    n2: float = 1.0  # revestimento superior (cover)
+    n3: float = 1.45  # revestimento direito
+    n4: float = 1.45  # revestimento inferior
+    n5: float = 1.45  # revestimento esquerdo
+
     mode_x: int = 0
     mode_y: int = 0
     polarization: Polarization = Polarization.TE
@@ -73,10 +73,10 @@ class WaveguideResults:
     ky: float = 0.0
     beta: float = 0.0
     n_eff: float = 0.0
-    gamma_x3: float = 0.0   # γx3 (direita)
-    gamma_x5: float = 0.0   # γx5 (esquerda)
-    gamma_y2: float = 0.0   # γy2 (cima)
-    gamma_y4: float = 0.0   # γy4 (baixo)
+    gamma_x3: float = 0.0  # γx3 (direita)
+    gamma_x5: float = 0.0  # γx5 (esquerda)
+    gamma_y2: float = 0.0  # γy2 (cima)
+    gamma_y4: float = 0.0  # γy4 (baixo)
     V: float = 0.0
     # amplitudes
     C1: float = 1.0
@@ -141,7 +141,7 @@ class WaveguideModel:
         n5 = self.params.n5
 
         # limites de busca: 0 até próximo do corte
-        kmax = k0 * np.sqrt(n1**2 - max(n3, n5)**2) - 1e-5
+        kmax = k0 * np.sqrt(n1**2 - max(n3, n5) ** 2) - 1e-5
         if kmax <= 0:
             return kx_est
 
@@ -150,12 +150,13 @@ class WaveguideModel:
                 return 1e9
             gam3 = np.sqrt(k0**2 * (n1**2 - n3**2) - kx**2) if n1 > n3 else 0
             gam5 = np.sqrt(k0**2 * (n1**2 - n5**2) - kx**2) if n1 > n5 else 0
-            term1 = np.arctan((n1**2 * gam3) / (n3**2 * kx)) if gam3 > 0 else np.pi/2
-            term2 = np.arctan((n1**2 * gam5) / (n5**2 * kx)) if gam5 > 0 else np.pi/2
+            term1 = np.arctan((n1**2 * gam3) / (n3**2 * kx)) if gam3 > 0 else np.pi / 2
+            term2 = np.arctan((n1**2 * gam5) / (n5**2 * kx)) if gam5 > 0 else np.pi / 2
             return kx * a - term1 - term2 - self.params.mode_x * np.pi
 
         try:
             from scipy.optimize import bisect
+
             return bisect(eq, 1e-6, kmax)
         except ImportError:
             # fallback simples (não usar scipy)
@@ -170,7 +171,7 @@ class WaveguideModel:
         n2 = self.params.n2
         n4 = self.params.n4
 
-        kmax = k0 * np.sqrt(n1**2 - max(n2, n4)**2) - 1e-5
+        kmax = k0 * np.sqrt(n1**2 - max(n2, n4) ** 2) - 1e-5
         if kmax <= 0:
             return ky_est
 
@@ -179,12 +180,13 @@ class WaveguideModel:
                 return 1e9
             gam2 = np.sqrt(k0**2 * (n1**2 - n2**2) - ky**2) if n1 > n2 else 0
             gam4 = np.sqrt(k0**2 * (n1**2 - n4**2) - ky**2) if n1 > n4 else 0
-            term1 = np.arctan(gam2 / ky) if gam2 > 0 else np.pi/2
-            term2 = np.arctan(gam4 / ky) if gam4 > 0 else np.pi/2
+            term1 = np.arctan(gam2 / ky) if gam2 > 0 else np.pi / 2
+            term2 = np.arctan(gam4 / ky) if gam4 > 0 else np.pi / 2
             return ky * b - term1 - term2 - self.params.mode_y * np.pi
 
         try:
             from scipy.optimize import bisect
+
             return bisect(eq, 1e-6, kmax)
         except ImportError:
             for ky in np.linspace(1e-6, kmax, 200):
@@ -206,13 +208,19 @@ class WaveguideModel:
             self.res.n_eff = self.res.beta / k0
 
         # Constantes de decaimento
-        n1, n2, n3, n4, n5 = self.params.n1, self.params.n2, self.params.n3, self.params.n4, self.params.n5
+        n1, n2, n3, n4, n5 = (
+            self.params.n1,
+            self.params.n2,
+            self.params.n3,
+            self.params.n4,
+            self.params.n5,
+        )
         k0 = self.res.k0
         beta = self.res.beta
-        self.res.gamma_y2 = np.sqrt(beta**2 - k0**2 * n2**2) if beta > k0*n2 else 0
-        self.res.gamma_y4 = np.sqrt(beta**2 - k0**2 * n4**2) if beta > k0*n4 else 0
-        self.res.gamma_x3 = np.sqrt(beta**2 - k0**2 * n3**2) if beta > k0*n3 else 0
-        self.res.gamma_x5 = np.sqrt(beta**2 - k0**2 * n5**2) if beta > k0*n5 else 0
+        self.res.gamma_y2 = np.sqrt(beta**2 - k0**2 * n2**2) if beta > k0 * n2 else 0
+        self.res.gamma_y4 = np.sqrt(beta**2 - k0**2 * n4**2) if beta > k0 * n4 else 0
+        self.res.gamma_x3 = np.sqrt(beta**2 - k0**2 * n3**2) if beta > k0 * n3 else 0
+        self.res.gamma_x5 = np.sqrt(beta**2 - k0**2 * n5**2) if beta > k0 * n5 else 0
 
     def _calc_amplitudes(self):
         ky = self.res.ky
@@ -258,7 +266,13 @@ class WaveguideModel:
         b = self.params.half_height
         kx = self.res.kx
         ky = self.res.ky
-        C1, C2, C3, C4, C5 = self.res.C1, self.res.C2, self.res.C3, self.res.C4, self.res.C5
+        C1, C2, C3, C4, C5 = (
+            self.res.C1,
+            self.res.C2,
+            self.res.C3,
+            self.res.C4,
+            self.res.C5,
+        )
         gx3 = self.res.gamma_x3
         gx5 = self.res.gamma_x5
         gy2 = self.res.gamma_y2
