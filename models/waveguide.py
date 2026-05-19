@@ -1,330 +1,299 @@
 # -*- coding: utf-8 -*-
 """
-====================================================================================================
-Modelo do Guia de Onda - Responsável pelos dados e cálculos físicos
+Modelo do Guia de Onda - 5 regiões (com cinco índices de revestimento - Kawano & Kitoh)
+Implementa as equações transcendentais completas.
 
-Data: 13/04/2026
-====================================================================================================
+Data: 19/05/2026
 """
 
 import numpy as np
-from dataclasses import dataclass, field
-from typing import Tuple, Optional
+from dataclasses import dataclass
 from enum import Enum
 
 
 class Polarization(Enum):
-    """Enum para tipos de polarização"""
-    TE = 1  # Modo TE (E_x)
-    TM = 2  # Modo TM (E_y)
+    TE = 1   # E_x (quasi-TM na notação de Kawano)
+    TM = 2   # E_y (quasi-TE)
 
 
 @dataclass
 class WaveguideParameters:
-    """Parâmetros de entrada do guia de onda"""
-    width: float = 4e-6          # Largura total (2a) em metros
-    height: float = 4e-6         # Altura total (2b) em metros
-    wavelength: float = 1.55e-6  # Comprimento de onda em metros
-    n_core: float = 1.5          # Índice de refração do núcleo
-    n_cladding: float = 1.4      # Índice de refração do revestimento
-    mode_x: int = 0              # Número do modo em x (p)
-    mode_y: int = 0              # Número do modo em y (q)
+    # Dimensões
+    width: float = 4e-6          # 2a (m)
+    height: float = 4e-6         # 2b (m)
+    wavelength: float = 1.55e-6  # λ (m)
+    
+    # Índices das 5 regiões (Kawano Fig. 2.3)
+    n1: float = 1.5              # núcleo
+    n2: float = 1.0              # revestimento superior (cover)
+    n3: float = 1.45             # revestimento direito
+    n4: float = 1.45             # revestimento inferior
+    n5: float = 1.45             # revestimento esquerdo
+    
+    mode_x: int = 0
+    mode_y: int = 0
     polarization: Polarization = Polarization.TE
-    resolution: int = 301        # Resolução da malha
-    extension: float = 2.5       # Fator de extensão da janela
-    
+    resolution: int = 301
+    extension: float = 2.5
+
     def __post_init__(self):
-        """Valida os parâmetros após inicialização"""
         self._validate()
-    
+
     def _validate(self):
-        """Valida os parâmetros de entrada"""
-        if self.width <= 0:
-            raise ValueError("Largura deve ser positiva")
-        if self.height <= 0:
-            raise ValueError("Altura deve ser positiva")
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("Dimensões devem ser positivas")
         if self.wavelength <= 0:
-            raise ValueError("Comprimento de onda deve ser positivo")
-        if self.n_core <= 0:
-            raise ValueError("Índice do núcleo deve ser positivo")
-        if self.n_cladding <= 0:
-            raise ValueError("Índice do revestimento deve ser positivo")
-        if self.n_cladding >= self.n_core:
-            raise ValueError("Índice do revestimento deve ser menor que o do núcleo")
-        if self.mode_x < 0:
-            raise ValueError("Número do modo em x deve ser ≥ 0")
-        if self.mode_y < 0:
-            raise ValueError("Número do modo em y deve ser ≥ 0")
+            raise ValueError("Comprimento de onda positivo")
+        if self.n1 <= max(self.n2, self.n3, self.n4, self.n5):
+            raise ValueError("n1 deve ser maior que todos os revestimentos")
+        if self.mode_x < 0 or self.mode_y < 0:
+            raise ValueError("Ordens de modo não negativas")
         if self.resolution < 50:
             raise ValueError("Resolução deve ser ≥ 50")
-        if self.extension < 1.2 or self.extension > 4.0:
+        if not (1.2 <= self.extension <= 4.0):
             raise ValueError("Extensão deve estar entre 1.2 e 4.0")
-    
+
     @property
-    def half_width(self) -> float:
-        """Meia-largura a"""
+    def half_width(self):
         return self.width / 2
-    
+
     @property
-    def half_height(self) -> float:
-        """Meia-altura b"""
+    def half_height(self):
         return self.height / 2
-    
+
     @property
-    def delta(self) -> float:
-        """Diferença relativa de índice"""
-        return (self.n_core**2 - self.n_cladding**2) / (2 * self.n_core**2) * 100
+    def delta_rel(self):
+        return (self.n1**2 - self.n2**2) / (2 * self.n1**2) * 100
 
 
 @dataclass
 class WaveguideResults:
-    """Resultados dos cálculos do guia de onda"""
-    k0: float = 0.0                    # Número de onda no vácuo
-    kx: float = 0.0                    # Componente x do número de onda
-    ky: float = 0.0                    # Componente y do número de onda
-    beta: float = 0.0                  # Constante de propagação
-    n_eff: float = 0.0                 # Índice efetivo
-    gamma_x: float = 0.0               # Constante de decaimento em x
-    gamma_y: float = 0.0               # Constante de decaimento em y
-    V: float = 0.0                     # Frequência normalizada
-    C1: float = 1.0                    # Amplitude no núcleo
-    C2: float = 0.0                    # Amplitude região 2
-    C3: float = 0.0                    # Amplitude região 3
-    C4: float = 0.0                    # Amplitude região 4
-    C5: float = 0.0                    # Amplitude região 5
-    field: Optional[np.ndarray] = None     # Campo elétrico
-    intensity: Optional[np.ndarray] = None # Intensidade
-    x_grid: Optional[np.ndarray] = None    # Malha x
-    y_grid: Optional[np.ndarray] = None    # Malha y
-    X_mesh: Optional[np.ndarray] = None    # Malha 2D X
-    Y_mesh: Optional[np.ndarray] = None    # Malha 2D Y
-    
-    @property
-    def is_guided(self) -> bool:
-        """Verifica se o modo é guiado"""
-        return self.n2 <= self.n_eff <= self.n1 if hasattr(self, 'n1') else False
+    k0: float = 0.0
+    kx: float = 0.0
+    ky: float = 0.0
+    beta: float = 0.0
+    n_eff: float = 0.0
+    gamma_x3: float = 0.0   # γx3 (direita)
+    gamma_x5: float = 0.0   # γx5 (esquerda)
+    gamma_y2: float = 0.0   # γy2 (cima)
+    gamma_y4: float = 0.0   # γy4 (baixo)
+    V: float = 0.0
+    # amplitudes
+    C1: float = 1.0
+    C2: float = 0.0
+    C3: float = 0.0
+    C4: float = 0.0
+    C5: float = 0.0
+    field: np.ndarray = None
+    intensity: np.ndarray = None
+    x_grid: np.ndarray = None
+    y_grid: np.ndarray = None
+    X_mesh: np.ndarray = None
+    Y_mesh: np.ndarray = None
 
 
 class WaveguideModel:
-    """
-    Modelo do guia de onda - Responsável pelos cálculos físicos
-    Segue o padrão de design Strategy para os cálculos
-    """
-    
     def __init__(self, params: WaveguideParameters):
         self.params = params
-        self.results = WaveguideResults()
-        
+        self.res = WaveguideResults()
+
     def calculate(self) -> WaveguideResults:
-        """Executa todos os cálculos"""
-        self._calculate_wavenumbers()
-        self._calculate_propagation_constants()
-        self._calculate_amplitudes()
-        self._calculate_normalized_frequency()
+        self._calc_wavenumbers()
+        self._calc_propagation()
+        self._calc_amplitudes()
+        self._calc_V()
         self._generate_mesh()
-        self._calculate_field()
-        return self.results
-    
-    def _calculate_wavenumbers(self):
-        """Calcula números de onda"""
-        self.results.k0 = 2 * np.pi / self.params.wavelength
-        
-        # Componente kx
-        if self.params.mode_x == 0:
-            self.results.kx = np.pi / (2 * self.params.half_width)
+        self._calc_field()
+        return self.res
+
+    def _calc_wavenumbers(self):
+        k0 = 2 * np.pi / self.params.wavelength
+        self.res.k0 = k0
+
+        # Estimativa inicial dos números de onda transversais
+        # Usa aproximação de guia planar equivalente
+        a, b = self.params.half_width, self.params.half_height
+        p, q = self.params.mode_x, self.params.mode_y
+
+        # Direção x
+        if p == 0:
+            kx_est = np.pi / (2 * a)
         else:
-            self.results.kx = self.params.mode_x * np.pi / (2 * self.params.half_width)
-        
-        # Componente ky
-        if self.params.mode_y == 0:
-            self.results.ky = np.pi / (2 * self.params.half_height)
+            kx_est = p * np.pi / (2 * a)
+
+        # Direção y
+        if q == 0:
+            ky_est = np.pi / (2 * b)
         else:
-            self.results.ky = self.params.mode_y * np.pi / (2 * self.params.half_height)
-    
-    def _calculate_propagation_constants(self):
-        """Calcula constantes de propagação e decaimento"""
-        beta_squared = (self.results.k0**2 * self.params.n_core**2 - 
-                        self.results.kx**2 - self.results.ky**2)
-        
-        if beta_squared <= 0:
-            self.results.beta = np.sqrt(abs(beta_squared))
-            self.results.n_eff = 0
+            ky_est = q * np.pi / (2 * b)
+
+        # Resolve as equações transcendentais via bisseção
+        kx_sol = self._solve_kx(kx_est, a)
+        ky_sol = self._solve_ky(ky_est, b)
+
+        self.res.kx = kx_sol
+        self.res.ky = ky_sol
+
+    def _solve_kx(self, kx_est, a):
+        k0 = self.res.k0
+        n1 = self.params.n1
+        n3 = self.params.n3
+        n5 = self.params.n5
+
+        # limites de busca: 0 até próximo do corte
+        kmax = k0 * np.sqrt(n1**2 - max(n3, n5)**2) - 1e-5
+        if kmax <= 0:
+            return kx_est
+
+        def eq(kx):
+            if kx <= 0:
+                return 1e9
+            gam3 = np.sqrt(k0**2 * (n1**2 - n3**2) - kx**2) if n1 > n3 else 0
+            gam5 = np.sqrt(k0**2 * (n1**2 - n5**2) - kx**2) if n1 > n5 else 0
+            term1 = np.arctan((n1**2 * gam3) / (n3**2 * kx)) if gam3 > 0 else np.pi/2
+            term2 = np.arctan((n1**2 * gam5) / (n5**2 * kx)) if gam5 > 0 else np.pi/2
+            return kx * a - term1 - term2 - self.params.mode_x * np.pi
+
+        try:
+            from scipy.optimize import bisect
+            return bisect(eq, 1e-6, kmax)
+        except ImportError:
+            # fallback simples (não usar scipy)
+            for kx in np.linspace(1e-6, kmax, 200):
+                if abs(eq(kx)) < 1e-6:
+                    return kx
+            return kx_est
+
+    def _solve_ky(self, ky_est, b):
+        k0 = self.res.k0
+        n1 = self.params.n1
+        n2 = self.params.n2
+        n4 = self.params.n4
+
+        kmax = k0 * np.sqrt(n1**2 - max(n2, n4)**2) - 1e-5
+        if kmax <= 0:
+            return ky_est
+
+        def eq(ky):
+            if ky <= 0:
+                return 1e9
+            gam2 = np.sqrt(k0**2 * (n1**2 - n2**2) - ky**2) if n1 > n2 else 0
+            gam4 = np.sqrt(k0**2 * (n1**2 - n4**2) - ky**2) if n1 > n4 else 0
+            term1 = np.arctan(gam2 / ky) if gam2 > 0 else np.pi/2
+            term2 = np.arctan(gam4 / ky) if gam4 > 0 else np.pi/2
+            return ky * b - term1 - term2 - self.params.mode_y * np.pi
+
+        try:
+            from scipy.optimize import bisect
+            return bisect(eq, 1e-6, kmax)
+        except ImportError:
+            for ky in np.linspace(1e-6, kmax, 200):
+                if abs(eq(ky)) < 1e-6:
+                    return ky
+            return ky_est
+
+    def _calc_propagation(self):
+        k0 = self.res.k0
+        n1 = self.params.n1
+        kx = self.res.kx
+        ky = self.res.ky
+        beta2 = k0**2 * n1**2 - (kx**2 + ky**2)
+        if beta2 < 0:
+            self.res.beta = 0.0
+            self.res.n_eff = 0.0
         else:
-            self.results.beta = np.sqrt(beta_squared)
-            self.results.n_eff = self.results.beta / self.results.k0
-        
+            self.res.beta = np.sqrt(beta2)
+            self.res.n_eff = self.res.beta / k0
+
         # Constantes de decaimento
-        gamma_x_squared = (self.results.kx**2 + self.results.beta**2 - 
-                          self.results.k0**2 * self.params.n_cladding**2)
-        gamma_y_squared = (self.results.ky**2 + self.results.beta**2 - 
-                          self.results.k0**2 * self.params.n_cladding**2)
-        
-        self.results.gamma_x = np.sqrt(abs(gamma_x_squared)) if gamma_x_squared > 0 else 0
-        self.results.gamma_y = np.sqrt(abs(gamma_y_squared)) if gamma_y_squared > 0 else 0
-    
-    def _calculate_amplitudes(self):
-        """Calcula constantes de amplitude"""
-        self.results.C1 = 1.0
-        
-        if abs(self.results.ky) > 1e-10:
-            self.results.C2 = self.results.C1 * np.cos(self.results.ky * self.params.half_height)
-            self.results.C4 = self.results.C1 * np.cos(self.results.ky * self.params.half_height)
-        else:
-            self.results.C2 = self.results.C1
-            self.results.C4 = self.results.C1
-            
-        if abs(self.results.kx) > 1e-10:
-            self.results.C3 = self.results.C1 * np.cos(self.results.kx * self.params.half_width)
-            self.results.C5 = self.results.C1 * np.cos(self.results.kx * self.params.half_width)
-        else:
-            self.results.C3 = self.results.C1
-            self.results.C5 = self.results.C1
-    
-    def _calculate_normalized_frequency(self):
-        """Calcula frequência normalizada V"""
-        if self.params.n_core > self.params.n_cladding:
-            self.results.V = (self.results.k0 * self.params.half_width * 
-                             np.sqrt(self.params.n_core**2 - self.params.n_cladding**2))
-        else:
-            self.results.V = 0
-    
+        n1, n2, n3, n4, n5 = self.params.n1, self.params.n2, self.params.n3, self.params.n4, self.params.n5
+        k0 = self.res.k0
+        beta = self.res.beta
+        self.res.gamma_y2 = np.sqrt(beta**2 - k0**2 * n2**2) if beta > k0*n2 else 0
+        self.res.gamma_y4 = np.sqrt(beta**2 - k0**2 * n4**2) if beta > k0*n4 else 0
+        self.res.gamma_x3 = np.sqrt(beta**2 - k0**2 * n3**2) if beta > k0*n3 else 0
+        self.res.gamma_x5 = np.sqrt(beta**2 - k0**2 * n5**2) if beta > k0*n5 else 0
+
+    def _calc_amplitudes(self):
+        ky = self.res.ky
+        b = self.params.half_height
+        self.res.C2 = self.res.C1 * np.cos(ky * b)
+        self.res.C4 = self.res.C1 * np.cos(ky * b)
+        kx = self.res.kx
+        a = self.params.half_width
+        self.res.C3 = self.res.C1 * np.cos(kx * a)
+        self.res.C5 = self.res.C1 * np.cos(kx * a)
+
+    def _calc_V(self):
+        k0 = self.res.k0
+        a = self.params.half_width
+        n1 = self.params.n1
+        n2 = self.params.n2  # uso do menor índice para aproximação
+        self.res.V = k0 * a * np.sqrt(n1**2 - n2**2) if n1 > n2 else 0
+
     def _generate_mesh(self):
-        """Gera a malha para cálculo do campo"""
         x_max = self.params.extension * self.params.half_width
         y_max = self.params.extension * self.params.half_height
-        
-        self.results.x_grid = np.linspace(-x_max, x_max, self.params.resolution)
-        self.results.y_grid = np.linspace(-y_max, y_max, self.params.resolution)
-        self.results.X_mesh, self.results.Y_mesh = np.meshgrid(self.results.x_grid, 
-                                                                self.results.y_grid)
-    
-    def _calculate_field(self):
-        """Calcula a distribuição do campo elétrico"""
-        field = np.zeros_like(self.results.X_mesh)
-        
-        for i in range(len(self.results.x_grid)):
-            for j in range(len(self.results.y_grid)):
-                x = self.results.X_mesh[i, j]
-                y = self.results.Y_mesh[i, j]
+        res = self.params.resolution
+        self.res.x_grid = np.linspace(-x_max, x_max, res)
+        self.res.y_grid = np.linspace(-y_max, y_max, res)
+        self.res.X_mesh, self.res.Y_mesh = np.meshgrid(self.res.x_grid, self.res.y_grid)
+
+    def _calc_field(self):
+        field = np.zeros_like(self.res.X_mesh)
+        for i in range(len(self.res.x_grid)):
+            for j in range(len(self.res.y_grid)):
+                x = self.res.X_mesh[i, j]
+                y = self.res.Y_mesh[i, j]
                 field[i, j] = self._field_at_point(x, y)
-        
-        # Normalização
-        max_field = np.max(np.abs(field))
-        if max_field > 0:
-            field = field / max_field
-        
-        self.results.field = field
-        self.results.intensity = field**2
-    
-    def _field_at_point(self, x: float, y: float) -> float:
-        """Calcula o campo em um ponto específico"""
+
+        max_f = np.max(np.abs(field))
+        if max_f > 0:
+            field /= max_f
+        self.res.field = field
+        self.res.intensity = field**2
+
+    def _field_at_point(self, x, y):
         a = self.params.half_width
         b = self.params.half_height
-        
-        # Região 1: Núcleo
+        kx = self.res.kx
+        ky = self.res.ky
+        C1, C2, C3, C4, C5 = self.res.C1, self.res.C2, self.res.C3, self.res.C4, self.res.C5
+        gx3 = self.res.gamma_x3
+        gx5 = self.res.gamma_x5
+        gy2 = self.res.gamma_y2
+        gy4 = self.res.gamma_y4
+
         if abs(x) <= a and abs(y) <= b:
-            return self.results.C1 * np.cos(self.results.kx * x) * np.cos(self.results.ky * y)
-        
-        # Região 2: Acima do núcleo
+            return C1 * np.cos(kx * x) * np.cos(ky * y)
         elif abs(x) <= a and y > b:
-            if self.results.gamma_y > 0:
-                return (self.results.C2 * np.cos(self.results.kx * x) * 
-                       np.exp(-self.results.gamma_y * (y - b)))
-            return 0
-        
-        # Região 4: Abaixo do núcleo
+            return C2 * np.cos(kx * x) * np.exp(-gy2 * (y - b)) if gy2 > 0 else 0
         elif abs(x) <= a and y < -b:
-            if self.results.gamma_y > 0:
-                return (self.results.C4 * np.cos(self.results.kx * x) * 
-                       np.exp(self.results.gamma_y * (y + b)))
-            return 0
-        
-        # Região 3: À direita do núcleo
+            return C4 * np.cos(kx * x) * np.exp(gy4 * (y + b)) if gy4 > 0 else 0
         elif x > a and abs(y) <= b:
-            if self.results.gamma_x > 0:
-                return (self.results.C3 * np.exp(-self.results.gamma_x * (x - a)) * 
-                       np.cos(self.results.ky * y))
-            return 0
-        
-        # Região 5: À esquerda do núcleo
+            return C3 * np.exp(-gx3 * (x - a)) * np.cos(ky * y) if gx3 > 0 else 0
         elif x < -a and abs(y) <= b:
-            if self.results.gamma_x > 0:
-                return (self.results.C5 * np.exp(self.results.gamma_x * (x + a)) * 
-                       np.cos(self.results.ky * y))
+            return C5 * np.exp(gx5 * (x + a)) * np.cos(ky * y) if gx5 > 0 else 0
+        else:
             return 0
-        
-        # Cantos
-        return 0
-    
+
     def get_summary_text(self) -> str:
-        """Retorna texto resumo dos resultados"""
-        params = self.params
-        res = self.results
-        
-        # Determina tipo de modo
-        tipo_modo = f"TE_{{{params.mode_x}{params.mode_y}}}^x (E_x)" if params.polarization == Polarization.TE else f"TE_{{{params.mode_x}{params.mode_y}}}^y (E_y)"
-        
-        # Status do modo
-        if res.n_eff >= params.n_cladding and res.n_eff <= params.n_core and res.n_eff > 0:
-            status_modo = "Modo guiado (n₂ ≤ n_eff ≤ n₁)"
-        elif res.n_eff <= 0:
-            status_modo = "Modo abaixo do cutoff"
-        else:
-            status_modo = "AVISO - Índice efetivo fora da faixa esperada!"
-        
-        # Regime da fibra
-        if res.V < np.pi/2:
-            status_V = "Região de corte para modos de ordem superior"
-        elif res.V < np.pi:
-            status_V = "Região de modo único aproximado"
-        else:
-            status_V = "Região multimodo"
-        
+        p = self.params
+        r = self.res
+        tipo = "TE (E_x)" if p.polarization == Polarization.TE else "TM (E_y)"
+        status = "Guiado" if (p.n2 < r.n_eff < p.n1) else "Não guiado (cut-off)"
         return f"""
-{'='*49}
-RESULTADOS NUMÉRICOS - MÉTODO DE MARCATILI
-{'='*49}
+{'='*55}
+ RESULTADOS - MÉTODO DE MARCATILI (5 REGIÕES)
+{'='*55}
+ Guia: {p.width*1e6:.2f} × {p.height*1e6:.2f} μm²   λ = {p.wavelength*1e6:.3f} μm
+ n1={p.n1:.3f}  n2={p.n2:.3f}  n3={p.n3:.3f}  n4={p.n4:.3f}  n5={p.n5:.3f}
+ Modo: {tipo}  (p={p.mode_x}, q={p.mode_y})
 
-------------- PARÂMETROS DO GUIA --------------
-
-Largura do núcleo (2a)        : {params.width*1e6:.3f} µm
-Altura do núcleo (2b)         : {params.height*1e6:.3f} µm
-Comprimento de onda (λ)       : {params.wavelength*1e6:.3f} µm
-Índice do núcleo (n₁)         : {params.n_core:.4f}
-Índice do revestimento (n₂)   : {params.n_cladding:.4f}
-Diferença relativa (Δ)        : {params.delta:.4f} %
-
-------------- PARÂMETROS DO MODO -------------
-
-Modo                          : {tipo_modo}
-kx (componente x)             : {res.kx:.3e} rad/m
-ky (componente y)             : {res.ky:.3e} rad/m
-
------------ CONSTANTES DE PROPAGAÇÃO ----------
-
-Constante de propagação (β)   : {res.beta:.3e} rad/m
-Índice efetivo (n_eff)        : {res.n_eff:.6f}
-Status                        : {status_modo}
-
------------ CONSTANTES DE DECAIMENTO ----------
-
-γx (decaimento em x)          : {res.gamma_x:.3e} m⁻¹
-γy (decaimento em y)          : {res.gamma_y:.3e} m⁻¹
-
------------- FREQUÊNCIA NORMALIZADA ------------
-
-Parâmetro V                   : {res.V:.4f}
-Status                        : {status_V}
-{'='*49}
-
-
-
-
-
-
-
-
-
-
-
+ kx = {r.kx:.3e} rad/m    ky = {r.ky:.3e} rad/m
+ β  = {r.beta:.3e} rad/m    n_eff = {r.n_eff:.6f}
+ γy2 = {r.gamma_y2:.3e}   γy4 = {r.gamma_y4:.3e}
+ γx3 = {r.gamma_x3:.3e}   γx5 = {r.gamma_x5:.3e}
+ V   = {r.V:.4f}  →  {status}
+{'='*55}
 """
