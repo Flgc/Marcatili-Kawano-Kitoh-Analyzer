@@ -297,9 +297,9 @@ class WaveguideModel:
         tipo = "TE (E_x)" if p.polarization == Polarization.TE else "TM (E_y)"
         status = "Guiado" if (p.n2 < r.n_eff < p.n1) else "Não guiado (cut-off)"
         return f"""
-{'='*55}
+{'='*50}
  RESULTADOS - MÉTODO DE MARCATILI (5 REGIÕES)
-{'='*55}
+{'='*50}
  Guia: {p.width*1e6:.2f} × {p.height*1e6:.2f} μm²   λ = {p.wavelength*1e6:.3f} μm
  n1={p.n1:.3f}  n2={p.n2:.3f}  n3={p.n3:.3f}  n4={p.n4:.3f}  n5={p.n5:.3f}
  Modo: {tipo}  (p={p.mode_x}, q={p.mode_y})
@@ -309,5 +309,5 @@ class WaveguideModel:
  γy2 = {r.gamma_y2:.3e}   γy4 = {r.gamma_y4:.3e}
  γx3 = {r.gamma_x3:.3e}   γx5 = {r.gamma_x5:.3e}
  V   = {r.V:.4f}  →  {status}
-{'='*55}
+{'='*50}
 """

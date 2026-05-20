@@ -14,6 +14,7 @@ import numpy as np
 import os
 
 from controllers.marcatili_controller import MarcatiliController
+from matplotlib.colorbar import Colorbar
 
 
 class MarcatiliKawanoGUI:
@@ -208,10 +209,29 @@ class MarcatiliKawanoGUI:
         if not hasattr(self, "canvas"):
             return
 
-        for ax in [self.ax1, self.ax2, self.ax3]:
-            ax.clear()
-            self.ax4.clear()
+        # 1. Remove todas as colorbars da figura existente que por ventura venha existir antes de forma segura
+        # Itera sobre uma cópia da lista para evitar erro de tamanho
+        """
+        for ax in self.figure.axes[:]:
+            if (
+                hasattr(ax, "colorbar")
+                or isinstance(ax, Colorbar)
+                or "Colorbar" in str(type(ax))
+            ):
+                ax.remove()
+        """
+        # Simplificando o código anterior
+        for ax in self.figure.axes[:]:
+            if isinstance(ax, Colorbar) or "Colorbar" in str(type(ax)):
+                ax.remove()
 
+        # 2. Realize a limpeza do conteúdo de todos os eixos que por ventura venha existir antes
+        self.ax1.clear()
+        self.ax2.clear()
+        self.ax3.clear()
+        self.ax4.clear()
+
+        # 3. Agora sim, adicione os textos informativos nos eixos vazios
         self.ax1.text(
             0.5,
             0.5,
@@ -222,7 +242,10 @@ class MarcatiliKawanoGUI:
             fontsize=12,
             color="gray",
         )
+
         self.ax1.set_title("Distribuição do Campo")
+        self.ax1.set_xlabel("x (μm)")
+        self.ax1.set_ylabel("y (μm)")
 
         self.ax2.text(
             0.5,
@@ -233,6 +256,8 @@ class MarcatiliKawanoGUI:
             va="center",
         )
         self.ax2.set_title("Corte y=0")
+        self.ax2.set_xlabel("x (μm)")
+        self.ax2.set_ylabel("Campo (u.a.)")
 
         self.ax3.text(
             0.5,
@@ -243,6 +268,8 @@ class MarcatiliKawanoGUI:
             va="center",
         )
         self.ax3.set_title("Corte x=0")
+        self.ax3.set_xlabel("y (μm)")
+        self.ax3.set_ylabel("Campo (u.a.)")
 
         # Axes3D precisa de (x, y, z, s)
         self.ax4.text(
@@ -254,7 +281,15 @@ class MarcatiliKawanoGUI:
             ha="center",
             va="center",
         )
-        self.ax4.set_title("3D")
+        self.ax4.set_title("Visualização 3D")
+        self.ax4.set_xlabel("x (μm)")
+        self.ax4.set_ylabel("y (μm)")
+        self.ax4.set_zlabel("Campo (u.a.)")
+
+        # 4. Remove título geral da figura, se existir
+        self.figure.suptitle("")
+
+        # 5. Por fim, redesenhe o canvas
         self.canvas.draw()
 
     def _validate_inputs(self):
@@ -283,9 +318,11 @@ class MarcatiliKawanoGUI:
             return False
 
     def _on_calculate(self):
+        self._clear_plots()  # limpa gráficos antigos - precisa estar aqui para garantir a limpeza dos resultados anteriores
+
         if not self._validate_inputs():
             return
-        self._clear_plots()  # limpa gráficos antigos
+
         try:
             self.controller.set_parameters(
                 width_um=float(self.width_var.get()),
@@ -350,6 +387,7 @@ class MarcatiliKawanoGUI:
             linestyle="--",
         )
         self.ax1.add_patch(rect)
+
         self.figure.colorbar(im, ax=self.ax1, label="Campo (u.a.)")
 
         idx_y = np.argmin(np.abs(res.y_grid))
@@ -390,11 +428,20 @@ class MarcatiliKawanoGUI:
         )
         self.canvas.draw()
 
+        # Remove colorbar anterior se existir
+        # Itera sobre uma cópia da lista para evitar erro de tamanho
+        for ax in self.figure.axes[:]:
+            if isinstance(ax, Colorbar) or "Colorbar" in str(type(ax)):
+                ax.remove()
+
+        # Agora crie a nova colobar limpa
+        self.figure.colorbar(im, ax=self.ax1, label="Campo (u.a.)")
+
     def _on_clear(self):
         if messagebox.askyesno(
             "Limpar tudo", "Resetar todos os parâmetros e gráficos?"
         ):
-            # reset campos
+            # 1. reset dos campos de entrada
             self.width_var.set("4.0")
             self.height_var.set("4.0")
             self.lambda_var.set("1.55")
@@ -408,12 +455,24 @@ class MarcatiliKawanoGUI:
             self.polarization_var.set(1)
             self.resolution_var.set("301")
             self.extension_var.set("2.5")
+
+            # 2. Limpe texto dos resultados
             self.result_text.delete(1.0, tk.END)
             self.result_text.insert(tk.END, "Aguardando cálculo...")
+
+            # 3. Limpe os gráficos e remova qualquer barra de cores residual
             self._clear_plots()
+
+            # 4. Resete o título da figura
+            self.figure.suptitle("")
+            self.canvas.draw()
+
+            # 5. Resete o estado dos botões
             self.save_btn.config(state="disabled")
             self.export_btn.config(state="disabled")
             self._calculation_done = False
+
+            # 6. Resete o controller
             self.controller.reset()
 
     def _on_save(self):
