@@ -333,6 +333,8 @@ class WaveguideModel:
         self.res.intensity = field**2
 
     def _field_at_point(self, x, y):
+        """
+        O bloco comentado será retirado posteriormente
         a = self.params.half_width
         b = self.params.half_height
         kx = self.res.kx
@@ -361,6 +363,60 @@ class WaveguideModel:
             return C5 * np.exp(gx5 * (x + a)) * np.cos(ky * y) if gx5 > 0 else 0
         else:
             return 0
+        """
+
+        # Adequação experimental - 01-06-26
+        """
+        Agora o campo obedecerá:
+            - Núcleo: C1 * cos(kx*x + φx) * cos(ky*y + φy)
+            - Revestimentos: decaimento exponencial multiplicado pelo cosseno apropriado.
+        Com isso espero ser possível reproduzir fielmente as equações (1.38) e (1.82),
+        afim de mostrar o deslocamento do pico em guias assimétricos e o decaimento
+        exponencial visível nos cortes transversais.      
+        """
+
+        a = self.params.half_width
+        b = self.params.half_height
+        kx = self.res.kx
+        ky = self.res.ky
+        phi_x = self.res.phi_x
+        phi_y = self.res.phi_y
+        C1 = self.res.C1
+        C2 = self.res.C2
+        C3 = self.res.C3
+        C4 = self.res.C4
+        C5 = self.res.C5
+        gx3 = self.res.gamma_x3
+        gx5 = self.res.gamma_x5
+        gy2 = self.res.gamma_y2
+        gy4 = self.res.gamma_y4
+
+        # Região 1: núcleo
+        if abs(x) <= a and abs(y) <= b:
+            return C1 * math.cos(kx * x + phi_x) * math.cos(ky * y + phi_y)
+
+        # Região 2: revestimento superior (y > b, |x| <= a)
+        if abs(x) <= a and y > b:
+            val = C2 * math.cos(kx * x + phi_x) * math.exp(-gy2 * (y - b))
+        return val if gy2 > 0 else 0.0
+
+        # Região 4: revestimento inferior (y < -b, |x| <= a)
+        if abs(x) <= a and y < -b:
+            val = C4 * math.cos(kx * x + phi_x) * math.exp(gy4 * (y + b))
+        return val if gy4 > 0 else 0.0
+
+        # Região 3: revestimento direito (x > a, |y| <= b)
+        if x > a and abs(y) <= b:
+            val = C3 * math.exp(-gx3 * (x - a)) * math.cos(ky * y + phi_y)
+        return val if gx3 > 0 else 0.0
+
+        # Região 5: revestimento esquerdo (x < -a, |y| <= b)
+        if x < -a and abs(y) <= b:
+            val = C5 * math.exp(gx5 * (x + a)) * math.cos(ky * y + phi_y)
+        return val if gx5 > 0 else 0.0
+
+        # Cantos (desprezados pelo método de Marcatili)
+        return 0.0
 
     def get_summary_text(self) -> str:
         p = self.params
