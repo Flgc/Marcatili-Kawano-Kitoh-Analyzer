@@ -92,7 +92,7 @@ class WaveguideResults:
     Y_mesh: np.ndarray = None
 
     """ Adequação experimental, adicionada das fases - 01-06-26
-    
+
     Motivação: As soluções no núcleo devem ser cos(kx*x + φx) * cos(ky*y + φy),
     não apenas cos(kx*x)*cos(ky*y). As fases são determinadas pelas condições
     de contorno e são essenciais para reproduzir o deslocamento do pico do
@@ -231,6 +231,23 @@ class WaveguideModel:
         self.res.gamma_y4 = np.sqrt(beta**2 - k0**2 * n4**2) if beta > k0 * n4 else 0
         self.res.gamma_x3 = np.sqrt(beta**2 - k0**2 * n3**2) if beta > k0 * n3 else 0
         self.res.gamma_x5 = np.sqrt(beta**2 - k0**2 * n5**2) if beta > k0 * n5 else 0
+
+        # Adequação experimental, cálculo das fases – baseado nas equações transcendentais de Kawano
+        # (dependem dos gammas já calculados) - 01-06-26
+        """ 
+            Antes o campo no núcleo era centrado em zero (função par), o que impedia
+            o deslocamento do pico para a região de menor índice (ex: n2=1). Agora as
+            fases são derivadas diretamente das condições de continuidade nas interfaces
+            x=-a e y=-b, conforme equações (2.52) e (2.53) de Kawano & Kitoh."        
+        """
+        kx = self.res.kx
+        ky = self.res.ky
+        # Fase em x (baseada na continuidade em x = -a)
+        self.res.phi_x = math.atan2(
+            self.params.n1**2 * self.res.gamma_x5, self.params.n5**2 * kx
+        )
+        # Fase em y (baseada na continuidade em y = -b)
+        self.res.phi_y = math.atan2(self.res.gamma_y2, ky)
 
     def _calc_amplitudes(self):
         ky = self.res.ky
