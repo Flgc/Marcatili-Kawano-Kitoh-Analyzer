@@ -91,6 +91,16 @@ class WaveguideResults:
     X_mesh: np.ndarray = None
     Y_mesh: np.ndarray = None
 
+    """ Adequação experimental, adicionada das fases - 01-06-26
+    
+    Motivação: As soluções no núcleo devem ser cos(kx*x + φx) * cos(ky*y + φy),
+    não apenas cos(kx*x)*cos(ky*y). As fases são determinadas pelas condições
+    de contorno e são essenciais para reproduzir o deslocamento do pico do
+    campo em guias assimétricos (ex: n2=1, n4=1.45)."
+    """
+    phi_x: float = 0.0  # fase na direção X (rad)
+    phi_y: float = 0.0  # fase na direção Y (rad)
+
 
 class WaveguideModel:
     def __init__(self, params: WaveguideParameters):
