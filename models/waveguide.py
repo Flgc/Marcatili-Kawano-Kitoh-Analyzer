@@ -250,6 +250,8 @@ class WaveguideModel:
         self.res.phi_y = math.atan2(self.res.gamma_y2, ky)
 
     def _calc_amplitudes(self):
+        """
+        O bloco comentado será retirado posteriormente
         ky = self.res.ky
         b = self.params.half_height
         self.res.C2 = self.res.C1 * np.cos(ky * b)
@@ -258,6 +260,48 @@ class WaveguideModel:
         a = self.params.half_width
         self.res.C3 = self.res.C1 * np.cos(kx * a)
         self.res.C5 = self.res.C1 * np.cos(kx * a)
+        """
+
+        # Adequação experimental - 01-06-26
+        """
+        As amplitudes dos campos evanescentes nos revestimentos dependem do valor
+        do campo nos cantos do núcleo. Com as fases corretas, a continuidade em
+        x=±a e y=±b é garantida, eliminando descontinuidades artificiais."
+        """
+
+        kx = self.res.kx
+        ky = self.res.ky
+        a = self.params.half_width
+        b = self.params.half_height
+        phi_x = self.res.phi_x
+        phi_y = self.res.phi_y
+
+        # Amplitudes nas interfaces
+        self.res.C1 = 1.0  # normalização arbitrária
+        self.res.C2 = (
+            self.res.C1
+            * math.cos(kx * a + phi_x)
+            * math.cos(ky * b + phi_y)
+            / math.cos(ky * b + phi_y)
+        )  # simplifica
+        self.res.C3 = (
+            self.res.C1
+            * math.cos(kx * a + phi_x)
+            * math.cos(ky * b + phi_y)
+            / math.cos(kx * a + phi_x)
+        )
+        self.res.C4 = (
+            self.res.C1
+            * math.cos(kx * a + phi_x)
+            * math.cos(ky * b + phi_y)
+            / math.cos(ky * b + phi_y)
+        )
+        self.res.C5 = (
+            self.res.C1
+            * math.cos(kx * a + phi_x)
+            * math.cos(ky * b + phi_y)
+            / math.cos(kx * a + phi_x)
+        )
 
     def _calc_V(self):
         k0 = self.res.k0
