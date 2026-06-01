@@ -328,6 +328,8 @@ class WaveguideModel:
 
         # Facilita a comparação visual entre diferentes parâmetros e torna o deslocamento
         # do pico mais evidente nos gráficos
+        # A ideia é facilitar a comparação visual entre diferentes parâmetros e torna o
+        # deslocamento do pico mais evidente nos gráficos.
         max_f = np.max(np.abs(field))
         if max_f > 0:
             field /= max_f
@@ -437,6 +439,7 @@ class WaveguideModel:
  β  = {r.beta:.3e} rad/m    n_eff = {r.n_eff:.6f}
  γy2 = {r.gamma_y2:.3e}   γy4 = {r.gamma_y4:.3e}
  γx3 = {r.gamma_x3:.3e}   γx5 = {r.gamma_x5:.3e}
+ resumo += f" φx = {r.phi_x:.3f} rad    φy = {r.phi_y:.3f} rad\n"
  V   = {r.V:.4f}  →  {status}
 {'='*50}
 """
