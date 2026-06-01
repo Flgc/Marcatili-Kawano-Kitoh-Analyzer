@@ -326,6 +326,8 @@ class WaveguideModel:
                 y = self.res.Y_mesh[i, j]
                 field[i, j] = self._field_at_point(x, y)
 
+        # Facilita a comparação visual entre diferentes parâmetros e torna o deslocamento
+        # do pico mais evidente nos gráficos
         max_f = np.max(np.abs(field))
         if max_f > 0:
             field /= max_f
