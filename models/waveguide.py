@@ -243,11 +243,11 @@ class WaveguideModel:
         kx = self.res.kx
         ky = self.res.ky
         # Fase em x (baseada na continuidade em x = -a)
-        self.res.phi_x = math.atan2(
+        self.res.phi_x = np.atan2(
             self.params.n1**2 * self.res.gamma_x5, self.params.n5**2 * kx
         )
         # Fase em y (baseada na continuidade em y = -b)
-        self.res.phi_y = math.atan2(self.res.gamma_y2, ky)
+        self.res.phi_y = np.atan2(self.res.gamma_y2, ky)
 
     def _calc_amplitudes(self):
         """
@@ -280,27 +280,27 @@ class WaveguideModel:
         self.res.C1 = 1.0  # normalização arbitrária
         self.res.C2 = (
             self.res.C1
-            * math.cos(kx * a + phi_x)
-            * math.cos(ky * b + phi_y)
-            / math.cos(ky * b + phi_y)
+            * np.cos(kx * a + phi_x)
+            * np.cos(ky * b + phi_y)
+            / np.cos(ky * b + phi_y)
         )  # simplifica
         self.res.C3 = (
             self.res.C1
-            * math.cos(kx * a + phi_x)
-            * math.cos(ky * b + phi_y)
-            / math.cos(kx * a + phi_x)
+            * np.cos(kx * a + phi_x)
+            * np.cos(ky * b + phi_y)
+            / np.cos(kx * a + phi_x)
         )
         self.res.C4 = (
             self.res.C1
-            * math.cos(kx * a + phi_x)
-            * math.cos(ky * b + phi_y)
-            / math.cos(ky * b + phi_y)
+            * np.cos(kx * a + phi_x)
+            * np.cos(ky * b + phi_y)
+            / np.cos(ky * b + phi_y)
         )
         self.res.C5 = (
             self.res.C1
-            * math.cos(kx * a + phi_x)
-            * math.cos(ky * b + phi_y)
-            / math.cos(kx * a + phi_x)
+            * np.cos(kx * a + phi_x)
+            * np.cos(ky * b + phi_y)
+            / np.cos(kx * a + phi_x)
         )
 
     def _calc_V(self):
@@ -397,27 +397,31 @@ class WaveguideModel:
 
         # Região 1: núcleo
         if abs(x) <= a and abs(y) <= b:
-            return C1 * math.cos(kx * x + phi_x) * math.cos(ky * y + phi_y)
+            return C1 * np.cos(kx * x + phi_x) * np.cos(ky * y + phi_y)
 
         # Região 2: revestimento superior (y > b, |x| <= a)
         if abs(x) <= a and y > b:
-            val = C2 * math.cos(kx * x + phi_x) * math.exp(-gy2 * (y - b))
-        return val if gy2 > 0 else 0.0
+            if gy2 > 0:
+                return C2 * np.cos(kx * x + phi_x) * np.exp(-gy2 * (y - b))
+        return 0.0
 
         # Região 4: revestimento inferior (y < -b, |x| <= a)
         if abs(x) <= a and y < -b:
-            val = C4 * math.cos(kx * x + phi_x) * math.exp(gy4 * (y + b))
-        return val if gy4 > 0 else 0.0
+            if gy4 > 0:
+                return C4 * np.cos(kx * x + phi_x) * np.exp(gy4 * (y + b))
+        return 0.0
 
         # Região 3: revestimento direito (x > a, |y| <= b)
         if x > a and abs(y) <= b:
-            val = C3 * math.exp(-gx3 * (x - a)) * math.cos(ky * y + phi_y)
-        return val if gx3 > 0 else 0.0
+            if gx3 > 0:
+                return C3 * np.exp(-gx3 * (x - a)) * np.cos(ky * y + phi_y)
+        return 0.0
 
         # Região 5: revestimento esquerdo (x < -a, |y| <= b)
         if x < -a and abs(y) <= b:
-            val = C5 * math.exp(gx5 * (x + a)) * math.cos(ky * y + phi_y)
-        return val if gx5 > 0 else 0.0
+            if gx5 > 0:
+                return C5 * np.exp(gx5 * (x + a)) * np.cos(ky * y + phi_y)
+        return 0.0
 
         # Cantos (desprezados pelo método de Marcatili)
         return 0.0
