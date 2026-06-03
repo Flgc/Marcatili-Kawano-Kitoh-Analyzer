@@ -437,6 +437,96 @@ class MarcatiliKawanoGUI:
         # Agora crie a nova colobar limpa
         self.figure.colorbar(im, ax=self.ax1, label="Campo (u.a.)")
 
+        # Teste temporário com o plot para verificação do decaimento exponencial
+        # Adequação experimental - 02-06-26
+        """
+        if self.controller.results is not None:
+            res = self.controller.results
+            params = self.controller.params
+            x_um = res.x_grid * 1e6
+
+        # corte em y=0
+        idx_y = np.argmin(np.abs(res.y_grid))
+        field_cut = res.field[:, idx_y]
+
+        # Evita zeros ou negativos para log
+        field_abs = np.abs(field_cut)
+        field_abs[field_abs < 1e-12] = 1e-12
+
+        plt.figure("Decaimento Exponencial (teste - 2-6-26)")
+        plt.semilogy(x_um, field_abs, "b-")
+        plt.xlabel("x (μm)")
+        plt.ylabel("|Campo| (u.a.)")
+        plt.title("Verificação do decaimento exponencial (escala log)")
+        plt.grid(True, which="both", linestyle="--", alpha=0.5)
+
+        # Marca as bordas do núcleo
+        a_um = params.half_width * 1e6
+        plt.axvline(-a_um, color="r", linestyle="--")
+        plt.axvline(a_um, color="r", linestyle="--")
+        plt.show(block=False)  # mostra sem travar
+        """
+        if self.controller.results is not None:
+            res = self.controller.results
+            params = self.controller.params
+            x_um = res.x_grid * 1e6
+            y_um = res.y_grid * 1e6
+            a_um = params.half_width * 1e6
+            b_um = params.half_height * 1e6
+
+            # 1. Corte horizontal (y=0) – já existente
+            idx_y = np.argmin(np.abs(res.y_grid))
+            field_horiz = res.field[:, idx_y]
+            field_abs_h = np.abs(field_horiz)
+            field_abs_h[field_abs_h < 1e-12] = 1e-12
+
+            plt.figure("Decaimento Exponencial (teste para validação)")
+            plt.subplot(1, 2, 1)
+            plt.semilogy(x_um, field_abs_h, "b-")
+            plt.xlabel("x (μm)")
+            plt.ylabel("|Campo| (u.a.)")
+            plt.title("Corte horizontal (y=0)")
+            plt.axvline(-a_um, color="r", linestyle="--", label="núcleo")
+            plt.axvline(a_um, color="r", linestyle="--")
+            plt.grid(True, which="both", linestyle="--", alpha=0.5)
+
+            # 2. Corte vertical (x=0) – comparação da assimetria
+            idx_x = np.argmin(np.abs(res.x_grid))
+            field_vert = res.field[idx_x, :]
+            field_abs_v = np.abs(field_vert)
+            field_abs_v[field_abs_v < 1e-12] = 1e-12
+
+            plt.subplot(1, 2, 2)
+            plt.semilogy(y_um, field_abs_v, "r-")
+            plt.xlabel("y (μm)")
+            plt.ylabel("|Campo| (u.a.)")
+            plt.title("Corte vertical (x=0) – assimetria")
+            plt.axvline(-b_um, color="b", linestyle="--", label="núcleo")
+            plt.axvline(b_um, color="b", linestyle="--")
+
+            # Exibe os valores de γ
+            gamma_up = res.gamma_y2
+            gamma_down = res.gamma_y4
+            plt.text(
+                0.05,
+                0.95,
+                f"γ_up = {gamma_up:.2e} rad/m\nγ_down = {gamma_down:.2e} rad/m",
+                transform=plt.gca().transAxes,
+                verticalalignment="top",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+            )
+            plt.grid(True, which="both", linestyle="--", alpha=0.5)
+            plt.tight_layout()
+            plt.show(block=False)
+
+            mask = np.abs(field) > 1e-12
+
+            plt.figure()
+            plt.imshow(mask, origin="lower")
+            plt.title("Regiões efetivamente calculadas")
+            plt.colorbar()
+            plt.show()
+
     def _on_clear(self):
         if messagebox.askyesno(
             "Limpar tudo", "Resetar todos os parâmetros e gráficos?"

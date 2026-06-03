@@ -250,17 +250,6 @@ class WaveguideModel:
         self.res.phi_y = np.atan2(self.res.gamma_y2, ky)
 
     def _calc_amplitudes(self):
-        """
-        O bloco comentado será retirado posteriormente
-        ky = self.res.ky
-        b = self.params.half_height
-        self.res.C2 = self.res.C1 * np.cos(ky * b)
-        self.res.C4 = self.res.C1 * np.cos(ky * b)
-        kx = self.res.kx
-        a = self.params.half_width
-        self.res.C3 = self.res.C1 * np.cos(kx * a)
-        self.res.C5 = self.res.C1 * np.cos(kx * a)
-        """
 
         # Adequação experimental - 01-06-26
         """
@@ -326,6 +315,10 @@ class WaveguideModel:
                 y = self.res.Y_mesh[i, j]
                 field[i, j] = self._field_at_point(x, y)
 
+        print("Máximo:", np.max(np.abs(field)))
+        print("Mínimo:", np.min(np.abs(field)))
+        print("Pontos não nulos:", np.count_nonzero(np.abs(field) > 1e-12))
+
         # Facilita a comparação visual entre diferentes parâmetros e torna o deslocamento
         # do pico mais evidente nos gráficos
         # A ideia é facilitar a comparação visual entre diferentes parâmetros e torna o
@@ -337,38 +330,6 @@ class WaveguideModel:
         self.res.intensity = field**2
 
     def _field_at_point(self, x, y):
-        """
-        O bloco comentado será retirado posteriormente
-        a = self.params.half_width
-        b = self.params.half_height
-        kx = self.res.kx
-        ky = self.res.ky
-        C1, C2, C3, C4, C5 = (
-            self.res.C1,
-            self.res.C2,
-            self.res.C3,
-            self.res.C4,
-            self.res.C5,
-        )
-        gx3 = self.res.gamma_x3
-        gx5 = self.res.gamma_x5
-        gy2 = self.res.gamma_y2
-        gy4 = self.res.gamma_y4
-
-        if abs(x) <= a and abs(y) <= b:
-            return C1 * np.cos(kx * x) * np.cos(ky * y)
-        elif abs(x) <= a and y > b:
-            return C2 * np.cos(kx * x) * np.exp(-gy2 * (y - b)) if gy2 > 0 else 0
-        elif abs(x) <= a and y < -b:
-            return C4 * np.cos(kx * x) * np.exp(gy4 * (y + b)) if gy4 > 0 else 0
-        elif x > a and abs(y) <= b:
-            return C3 * np.exp(-gx3 * (x - a)) * np.cos(ky * y) if gx3 > 0 else 0
-        elif x < -a and abs(y) <= b:
-            return C5 * np.exp(gx5 * (x + a)) * np.cos(ky * y) if gx5 > 0 else 0
-        else:
-            return 0
-        """
-
         # Adequação experimental - 01-06-26
         """
         Agora o campo obedecerá:
@@ -376,7 +337,7 @@ class WaveguideModel:
             - Revestimentos: decaimento exponencial multiplicado pelo cosseno apropriado.
         Com isso espero ser possível reproduzir fielmente as equações (1.38) e (1.82),
         afim de mostrar o deslocamento do pico em guias assimétricos e o decaimento
-        exponencial visível nos cortes transversais.      
+        exponencial visível nos cortes transversais.
         """
 
         a = self.params.half_width
@@ -400,31 +361,27 @@ class WaveguideModel:
             return C1 * np.cos(kx * x + phi_x) * np.cos(ky * y + phi_y)
 
         # Região 2: revestimento superior (y > b, |x| <= a)
-        if abs(x) <= a and y > b:
+        elif abs(x) <= a and y > b:
             if gy2 > 0:
                 return C2 * np.cos(kx * x + phi_x) * np.exp(-gy2 * (y - b))
-        return 0.0
 
         # Região 4: revestimento inferior (y < -b, |x| <= a)
-        if abs(x) <= a and y < -b:
+        elif abs(x) <= a and y < -b:
             if gy4 > 0:
                 return C4 * np.cos(kx * x + phi_x) * np.exp(gy4 * (y + b))
-        return 0.0
 
         # Região 3: revestimento direito (x > a, |y| <= b)
-        if x > a and abs(y) <= b:
+        elif x > a and abs(y) <= b:
             if gx3 > 0:
                 return C3 * np.exp(-gx3 * (x - a)) * np.cos(ky * y + phi_y)
-        return 0.0
 
         # Região 5: revestimento esquerdo (x < -a, |y| <= b)
-        if x < -a and abs(y) <= b:
+        elif x < -a and abs(y) <= b:
             if gx5 > 0:
                 return C5 * np.exp(gx5 * (x + a)) * np.cos(ky * y + phi_y)
-        return 0.0
-
-        # Cantos (desprezados pelo método de Marcatili)
-        return 0.0
+        else:
+            # Cantos externos (desprezados pelo método de Marcatili)
+            return 0.0
 
     def get_summary_text(self) -> str:
         p = self.params
@@ -443,7 +400,7 @@ class WaveguideModel:
  β  = {r.beta:.3e} rad/m    n_eff = {r.n_eff:.6f}
  γy2 = {r.gamma_y2:.3e}   γy4 = {r.gamma_y4:.3e}
  γx3 = {r.gamma_x3:.3e}   γx5 = {r.gamma_x5:.3e}
- resumo += f" φx = {r.phi_x:.3f} rad    φy = {r.phi_y:.3f} rad\n"
+ resumo += f" φx = {r.phi_x:.3f} rad  φy = {r.phi_y:.3f} rad"
  V   = {r.V:.4f}  →  {status}
 {'='*50}
 """
