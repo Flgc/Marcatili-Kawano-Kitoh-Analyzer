@@ -267,46 +267,45 @@ class WaveguideModel:
 
     def _calc_amplitudes(self):
 
-        # Adequação experimental - 01-06-26
+        # Adequação experimental - 02-06-26
         """
-        As amplitudes dos campos evanescentes nos revestimentos dependem do valor
-        do campo nos cantos do núcleo. Com as fases corretas, a continuidade em
-        x=±a e y=±b é garantida, eliminando descontinuidades artificiais."
+        Calcula as amplitudes do campo nas cinco regiões (C1 a C5)
+        utilizando as condições de continuidade do campo elétrico
+        nas interfaces do núcleo.
         """
 
+        # Geometria e números de onda
+        a = self.params.half_width  # semi-largura (m)
+        b = self.params.half_height  # semi-altura (m)
         kx = self.res.kx
         ky = self.res.ky
-        a = self.params.half_width
-        b = self.params.half_height
         phi_x = self.res.phi_x
         phi_y = self.res.phi_y
 
-        # Amplitudes nas interfaces
-        self.res.C1 = 1.0  # normalização arbitrária
-        self.res.C2 = (
-            self.res.C1
-            * np.cos(kx * a + phi_x)
-            * np.cos(ky * b + phi_y)
-            / np.cos(ky * b + phi_y)
-        )  # simplifica
-        self.res.C3 = (
-            self.res.C1
-            * np.cos(kx * a + phi_x)
-            * np.cos(ky * b + phi_y)
-            / np.cos(kx * a + phi_x)
-        )
-        self.res.C4 = (
-            self.res.C1
-            * np.cos(kx * a + phi_x)
-            * np.cos(ky * b + phi_y)
-            / np.cos(ky * b + phi_y)
-        )
-        self.res.C5 = (
-            self.res.C1
-            * np.cos(kx * a + phi_x)
-            * np.cos(ky * b + phi_y)
-            / np.cos(kx * a + phi_x)
-        )
+        # Amplitude no núcleo (normalização arbitrária, será ajustada depois)
+        C1 = 1.0
+
+        # Amplitudes nas interfaces (continuidade do campo)
+        # Interface superior (y = b) -> região 2
+        C2 = C1 * np.cos(ky * b + phi_y)
+
+        # Interface inferior (y = -b) -> região 4
+        # cos(ky*(-b) + phi_y) = cos(ky*b - phi_y)
+        C4 = C1 * np.cos(ky * b - phi_y)
+
+        # Interface direita (x = a) -> região 3
+        C3 = C1 * np.cos(kx * a + phi_x)
+
+        # Interface esquerda (x = -a) -> região 5
+        # cos(kx*(-a) + phi_x) = cos(kx*a - phi_x)
+        C5 = C1 * np.cos(kx * a - phi_x)
+
+        # Armazena as amplitudes no objeto de resultados
+        self.res.C1 = C1
+        self.res.C2 = C2
+        self.res.C3 = C3
+        self.res.C4 = C4
+        self.res.C5 = C5
 
     def _calc_V(self):
         k0 = self.res.k0
