@@ -287,6 +287,16 @@ class WaveguideModel:
             phi_x = np.arctan2((n1**2 * gamma_x5), (n5**2 * kx))
             phi_y = np.arctan2((n1**2 * gamma_y2), (n2**2 * ky))
 
+        # === TESTE DO MODO FUNDAMENTAL ===
+        print("\n===== TESTE DO MODO =====")
+        print(f"p = {self.params.mode_x}")
+        print(f"q = {self.params.mode_y}")
+        print(f"kx = {self.res.kx:.6e} rad/m")
+        print(f"ky = {self.res.ky:.6e} rad/m")
+        print(f"phi_x = {phi_x:.6f} rad")
+        print(f"phi_y = {phi_y:.6f} rad")
+        print("===========================\n")
+
         # Armazena as fases nos resultados
         # Fase em x
         self.res.phi_x = phi_x
@@ -370,61 +380,109 @@ class WaveguideModel:
         max_f = np.max(np.abs(field))
         if max_f > 0:
             field /= max_f
+
+        # Verificação de nós (zero crossings) no núcleo
+        # Índices do centro (x=0, y=0) na malha
+        idx_x0 = np.argmin(np.abs(self.res.x_grid))
+        idx_y0 = np.argmin(np.abs(self.res.y_grid))
+
+        # Cortes centrais
+        Ex_center = field[:, idx_y0]  # corte em y=0 (varia x)
+        Ey_center = field[idx_x0, :]  # corte em x=0 (varia y)
+
+        def count_zero_crossings(v):
+            """Conta quantas vezes o sinal muda (cruza por zero)"""
+            s = np.sign(v)
+            return np.sum(np.abs(np.diff(s)) > 1)
+
+        nós_x = count_zero_crossings(Ex_center)
+        nós_y = count_zero_crossings(Ey_center)
+
+        print(f"\n--- Nós dentro do núcleo ---")
+        print(f"Corte y=0 (variação em x): {nós_x} cruzamento(s) por zero")
+        print(f"Corte x=0 (variação em y): {nós_y} cruzamento(s) por zero")
+        print(
+            f"Esperado para modo (p={self.params.mode_x}, q={self.params.mode_y}): p nós em x, q nós em y\n"
+        )
+
+        # Determinação automática do centro modal (deslocamento do pico)
+        # Para guia assimétrico em y (n2 ≠ n4), o pico se desloca da origem
+        idx_x0 = np.argmin(np.abs(self.res.x_grid))  # índice mais próximo de x=0
+        field_y_center = np.abs(field[idx_x0, :])  # corte em x=0, |campo|
+        idx_peak = np.argmax(field_y_center)  # índice do máximo
+        y_peak = self.res.y_grid[idx_peak]  # coordenada y do pico
+
+        print("\n===== CENTRO MODAL =====")
+        print(f"y_peak = {y_peak*1e6:.6f} µm")
+        print(
+            f"Deslocamento em relação ao centro geométrico (y=0): {y_peak*1e6:.6f} µm"
+        )
+
         self.res.field = field
         self.res.intensity = field**2
 
     def _field_at_point(self, x, y):
-        # Adequação experimental - 01-06-26
-        """
-        Agora o campo obedecerá:
-            - Núcleo: C1 * cos(kx*x + φx) * cos(ky*y + φy)
-            - Revestimentos: decaimento exponencial multiplicado pelo cosseno apropriado.
-        Com isso espero ser possível reproduzir fielmente as equações (1.38) e (1.82),
-        afim de mostrar o deslocamento do pico em guias assimétricos e o decaimento
-        exponencial visível nos cortes transversais.
+        """02-06-26
+        Calcula o valor do campo elétrico em um ponto (x, y) do plano transversal,
+        conforme o método de Marcatili para cinco regiões.
+
+        O campo é definido por partes:
+        - Núcleo (região 1):   C1 * cos(kx*x + φx) * cos(ky*y + φy)
+        - Superior (região 2): C2 * cos(kx*x + φx) * exp(-γy2*(y - b))
+        - Inferior (região 4): C4 * cos(kx*x + φx) * exp( γy4*(y + b))
+        - Direita  (região 3): C3 * exp(-γx3*(x - a)) * cos(ky*y + φy)
+        - Esquerda (região 5): C5 * exp( γx5*(x + a)) * cos(ky*y + φy)
+        - Cantos: 0.0 (desprezado pelo método)
         """
 
+        # Geometria
         a = self.params.half_width
         b = self.params.half_height
+
+        # Números de onda e fases
         kx = self.res.kx
         ky = self.res.ky
         phi_x = self.res.phi_x
         phi_y = self.res.phi_y
+
+        # Amplitudes
         C1 = self.res.C1
         C2 = self.res.C2
         C3 = self.res.C3
         C4 = self.res.C4
         C5 = self.res.C5
+
+        # Constantes de decaimento
         gx3 = self.res.gamma_x3
         gx5 = self.res.gamma_x5
         gy2 = self.res.gamma_y2
         gy4 = self.res.gamma_y4
 
-        # Região 1: núcleo
+        # Região 1: núcleo (|x| ≤ a e |y| ≤ b)
         if abs(x) <= a and abs(y) <= b:
             return C1 * np.cos(kx * x + phi_x) * np.cos(ky * y + phi_y)
 
-        # Região 2: revestimento superior (y > b, |x| <= a)
+        # Região 2: revestimento superior (|x| ≤ a e y > b)
         elif abs(x) <= a and y > b:
             if gy2 > 0:
                 return C2 * np.cos(kx * x + phi_x) * np.exp(-gy2 * (y - b))
 
-        # Região 4: revestimento inferior (y < -b, |x| <= a)
+        # Região 4: revestimento inferior (|x| ≤ a e y < -b)
         elif abs(x) <= a and y < -b:
             if gy4 > 0:
                 return C4 * np.cos(kx * x + phi_x) * np.exp(gy4 * (y + b))
 
-        # Região 3: revestimento direito (x > a, |y| <= b)
+        # Região 3: revestimento direito (x > a e |y| ≤ b)
         elif x > a and abs(y) <= b:
             if gx3 > 0:
                 return C3 * np.exp(-gx3 * (x - a)) * np.cos(ky * y + phi_y)
 
-        # Região 5: revestimento esquerdo (x < -a, |y| <= b)
+        # Região 5: revestimento esquerdo (x < -a e |y| ≤ b)
         elif x < -a and abs(y) <= b:
             if gx5 > 0:
                 return C5 * np.exp(gx5 * (x + a)) * np.cos(ky * y + phi_y)
         else:
-            # Cantos externos (desprezados pelo método de Marcatili)
+            # Cantos externos (|x| > a e |y| > b) (desprezados pelo método de Marcatili)
             return 0.0
 
     def get_summary_text(self) -> str:
@@ -432,7 +490,8 @@ class WaveguideModel:
         r = self.res
         tipo = "TE (E_x)" if p.polarization == Polarization.TE else "TM (E_y)"
         status = "Guiado" if (p.n2 < r.n_eff < p.n1) else "Não guiado (cut-off)"
-        return f"""
+        # return f"""
+        resumo = f"""
 {'='*50}
  RESULTADOS - MÉTODO DE MARCATILI (5 REGIÕES)
 {'='*50}
@@ -440,11 +499,12 @@ class WaveguideModel:
  n1={p.n1:.3f}  n2={p.n2:.3f}  n3={p.n3:.3f}  n4={p.n4:.3f}  n5={p.n5:.3f}
  Modo: {tipo}  (p={p.mode_x}, q={p.mode_y})
 
- kx = {r.kx:.3e} rad/m    ky = {r.ky:.3e} rad/m
- β  = {r.beta:.3e} rad/m    n_eff = {r.n_eff:.6f}
- γy2 = {r.gamma_y2:.3e}   γy4 = {r.gamma_y4:.3e}
- γx3 = {r.gamma_x3:.3e}   γx5 = {r.gamma_x5:.3e}
- resumo += f" φx = {r.phi_x:.3f} rad  φy = {r.phi_y:.3f} rad"
+ kx  = {r.kx:.3e} rad/m       ky = {r.ky:.3e} rad/m
+ β   = {r.beta:.3e} rad/m  n_eff = {r.n_eff:.6f}
+ γy2 = {r.gamma_y2:.3e}      γy4 = {r.gamma_y4:.3e}
+ γx3 = {r.gamma_x3:.3e}      γx5 = {r.gamma_x5:.3e}
+ φx  = {r.phi_x:.3f} rad      φy = {r.phi_y:.3f} rad
  V   = {r.V:.4f}  →  {status}
 {'='*50}
 """
+        return resumo
