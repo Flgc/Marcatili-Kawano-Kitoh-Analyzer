@@ -145,62 +145,90 @@ class WaveguideModel:
         self.res.ky = ky_sol
 
     def _solve_kx(self, kx_est, a):
+        """02-06-26
+        Resolve a equação transcendental para kx (número de onda transversal em x)
+        considerando a polarização e a assimetria entre as regiões 3 (direita) e 5 (esquerda).
+        """
         k0 = self.res.k0
         n1 = self.params.n1
         n3 = self.params.n3
         n5 = self.params.n5
+        pol = self.params.polarization
+        m = self.params.mode_x
 
-        # limites de busca: 0 até próximo do corte
+        # Limite superior: menor dos cortes (n1 > n3 e n1 > n5)
         kmax = k0 * np.sqrt(n1**2 - max(n3, n5) ** 2) - 1e-5
         if kmax <= 0:
             return kx_est
 
         def eq(kx):
-            if kx <= 0:
-                return 1e9
-            gam3 = np.sqrt(k0**2 * (n1**2 - n3**2) - kx**2) if n1 > n3 else 0
-            gam5 = np.sqrt(k0**2 * (n1**2 - n5**2) - kx**2) if n1 > n5 else 0
-            term1 = np.arctan((n1**2 * gam3) / (n3**2 * kx)) if gam3 > 0 else np.pi / 2
-            term2 = np.arctan((n1**2 * gam5) / (n5**2 * kx)) if gam5 > 0 else np.pi / 2
-            return kx * a - term1 - term2 - self.params.mode_x * np.pi
+            if kx <= 1e-12:
+                return 1e9  # evita singularidade
+
+            # Constantes de decaimento nas regiões 3 e 5
+            g3 = np.sqrt(k0**2 * (n1**2 - n3**2) - kx**2) if n1 > n3 else 0.0
+            g5 = np.sqrt(k0**2 * (n1**2 - n5**2) - kx**2) if n1 > n5 else 0.0
+
+            if pol == Polarization.TE:
+                term3 = np.arctan(g3 / kx) if g3 > 0 else np.pi / 2
+                term5 = np.arctan(g5 / kx) if g5 > 0 else np.pi / 2
+            else:  # TM
+                term3 = np.arctan((n1**2 * g3) / (n3**2 * kx)) if g3 > 0 else np.pi / 2
+                term5 = np.arctan((n1**2 * g5) / (n5**2 * kx)) if g5 > 0 else np.pi / 2
+
+            return kx * a - term3 - term5 - m * np.pi
 
         try:
             from scipy.optimize import bisect
 
-            return bisect(eq, 1e-6, kmax)
+            return bisect(eq, 1e-8, kmax)
         except ImportError:
-            # fallback simples (não usar scipy)
-            for kx in np.linspace(1e-6, kmax, 200):
-                if abs(eq(kx)) < 1e-6:
+            # fallback simples
+            for kx in np.linspace(1e-8, kmax, 300):
+                if abs(eq(kx)) < 1e-7:
                     return kx
             return kx_est
 
     def _solve_ky(self, ky_est, b):
+        """
+        Resolve a equação transcendental para ky (número de onda transversal em y)
+        considerando a polarização e a assimetria entre as regiões 2 (superior) e 4 (inferior).
+        """
         k0 = self.res.k0
         n1 = self.params.n1
         n2 = self.params.n2
         n4 = self.params.n4
+        pol = self.params.polarization
+        q = self.params.mode_y
 
+        # Limite superior: menor dos cortes
         kmax = k0 * np.sqrt(n1**2 - max(n2, n4) ** 2) - 1e-5
         if kmax <= 0:
             return ky_est
 
         def eq(ky):
-            if ky <= 0:
+            if ky <= 1e-12:
                 return 1e9
-            gam2 = np.sqrt(k0**2 * (n1**2 - n2**2) - ky**2) if n1 > n2 else 0
-            gam4 = np.sqrt(k0**2 * (n1**2 - n4**2) - ky**2) if n1 > n4 else 0
-            term1 = np.arctan(gam2 / ky) if gam2 > 0 else np.pi / 2
-            term2 = np.arctan(gam4 / ky) if gam4 > 0 else np.pi / 2
-            return ky * b - term1 - term2 - self.params.mode_y * np.pi
+
+            g2 = np.sqrt(k0**2 * (n1**2 - n2**2) - ky**2) if n1 > n2 else 0.0
+            g4 = np.sqrt(k0**2 * (n1**2 - n4**2) - ky**2) if n1 > n4 else 0.0
+
+            if pol == Polarization.TE:
+                term2 = np.arctan(g2 / ky) if g2 > 0 else np.pi / 2
+                term4 = np.arctan(g4 / ky) if g4 > 0 else np.pi / 2
+            else:  # TM
+                term2 = np.arctan((n1**2 * g2) / (n2**2 * ky)) if g2 > 0 else np.pi / 2
+                term4 = np.arctan((n1**2 * g4) / (n4**2 * ky)) if g4 > 0 else np.pi / 2
+
+            return ky * b - term2 - term4 - q * np.pi
 
         try:
             from scipy.optimize import bisect
 
-            return bisect(eq, 1e-6, kmax)
+            return bisect(eq, 1e-8, kmax)
         except ImportError:
-            for ky in np.linspace(1e-6, kmax, 200):
-                if abs(eq(ky)) < 1e-6:
+            for ky in np.linspace(1e-8, kmax, 300):
+                if abs(eq(ky)) < 1e-7:
                     return ky
             return ky_est
 
