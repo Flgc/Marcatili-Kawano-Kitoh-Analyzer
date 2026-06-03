@@ -439,33 +439,7 @@ class MarcatiliKawanoGUI:
 
         # Teste temporário com o plot para verificação do decaimento exponencial
         # Adequação experimental - 02-06-26
-        """
-        if self.controller.results is not None:
-            res = self.controller.results
-            params = self.controller.params
-            x_um = res.x_grid * 1e6
 
-        # corte em y=0
-        idx_y = np.argmin(np.abs(res.y_grid))
-        field_cut = res.field[:, idx_y]
-
-        # Evita zeros ou negativos para log
-        field_abs = np.abs(field_cut)
-        field_abs[field_abs < 1e-12] = 1e-12
-
-        plt.figure("Decaimento Exponencial (teste - 2-6-26)")
-        plt.semilogy(x_um, field_abs, "b-")
-        plt.xlabel("x (μm)")
-        plt.ylabel("|Campo| (u.a.)")
-        plt.title("Verificação do decaimento exponencial (escala log)")
-        plt.grid(True, which="both", linestyle="--", alpha=0.5)
-
-        # Marca as bordas do núcleo
-        a_um = params.half_width * 1e6
-        plt.axvline(-a_um, color="r", linestyle="--")
-        plt.axvline(a_um, color="r", linestyle="--")
-        plt.show(block=False)  # mostra sem travar
-        """
         if self.controller.results is not None:
             res = self.controller.results
             params = self.controller.params

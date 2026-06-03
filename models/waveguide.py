@@ -205,10 +205,16 @@ class WaveguideModel:
             return ky_est
 
     def _calc_propagation(self):
+        """02-06-26
+        Calcula a constante de propagação beta, índice efetivo n_eff,
+        constantes de decaimento nas cinco regiões e as fases phi_x e phi_y.
+        """
         k0 = self.res.k0
         n1 = self.params.n1
         kx = self.res.kx
         ky = self.res.ky
+
+        # 1. Constante de propagação
         beta2 = k0**2 * n1**2 - (kx**2 + ky**2)
         if beta2 < 0:
             self.res.beta = 0.0
@@ -217,7 +223,7 @@ class WaveguideModel:
             self.res.beta = np.sqrt(beta2)
             self.res.n_eff = self.res.beta / k0
 
-        # Constantes de decaimento
+        # 2. Constantes de decaimento (gammas)
         n1, n2, n3, n4, n5 = (
             self.params.n1,
             self.params.n2,
@@ -227,27 +233,37 @@ class WaveguideModel:
         )
         k0 = self.res.k0
         beta = self.res.beta
-        self.res.gamma_y2 = np.sqrt(beta**2 - k0**2 * n2**2) if beta > k0 * n2 else 0
-        self.res.gamma_y4 = np.sqrt(beta**2 - k0**2 * n4**2) if beta > k0 * n4 else 0
-        self.res.gamma_x3 = np.sqrt(beta**2 - k0**2 * n3**2) if beta > k0 * n3 else 0
-        self.res.gamma_x5 = np.sqrt(beta**2 - k0**2 * n5**2) if beta > k0 * n5 else 0
 
-        # Adequação experimental, cálculo das fases – baseado nas equações transcendentais de Kawano
-        # (dependem dos gammas já calculados) - 01-06-26
-        """ 
-            Antes o campo no núcleo era centrado em zero (função par), o que impedia
-            o deslocamento do pico para a região de menor índice (ex: n2=1). Agora as
-            fases são derivadas diretamente das condições de continuidade nas interfaces
-            x=-a e y=-b, conforme equações (2.52) e (2.53) de Kawano & Kitoh."        
-        """
+        self.res.gamma_y2 = np.sqrt(beta**2 - k0**2 * n2**2) if beta > k0 * n2 else 0.0
+        self.res.gamma_y4 = np.sqrt(beta**2 - k0**2 * n4**2) if beta > k0 * n4 else 0.0
+        self.res.gamma_x3 = np.sqrt(beta**2 - k0**2 * n3**2) if beta > k0 * n3 else 0.0
+        self.res.gamma_x5 = np.sqrt(beta**2 - k0**2 * n5**2) if beta > k0 * n5 else 0.0
+
+        # 3. Cálculo das fases phi_x e phi_y (conforme polarização)
         kx = self.res.kx
         ky = self.res.ky
-        # Fase em x (baseada na continuidade em x = -a)
-        self.res.phi_x = np.atan2(
-            self.params.n1**2 * self.res.gamma_x5, self.params.n5**2 * kx
-        )
-        # Fase em y (baseada na continuidade em y = -b)
-        self.res.phi_y = np.atan2(self.res.gamma_y2, ky)
+        gamma_x3 = self.res.gamma_x3
+        gamma_x5 = self.res.gamma_x5
+        gamma_y2 = self.res.gamma_y2
+        gamma_y4 = self.res.gamma_y4  # (reservado para uso futuro)
+
+        # Permitirá a escolha da expressão correta com base no tipo de polarização
+        if self.params.polarization == Polarization.TE:
+            # TE: continuidade da derivada -> arctan(gamma/k)
+            phi_x = np.arctan2(gamma_x5, kx)  # usando interface esquerda (x = -a)
+            phi_y = np.arctan2(gamma_y2, ky)  # usando interface superior (y = b)
+            # Observação: Para guia totalmente assimétrico, o ideal seria usar uma média
+            # ou resolver um sistema, mas essa aproximação é aceitável para TE.
+        else:  # TM
+            # TM: continuidade da derivada com fatores dos índices
+            phi_x = np.arctan2((n1**2 * gamma_x5), (n5**2 * kx))
+            phi_y = np.arctan2((n1**2 * gamma_y2), (n2**2 * ky))
+
+        # Armazena as fases nos resultados
+        # Fase em x
+        self.res.phi_x = phi_x
+        # Fase em y
+        self.res.phi_y = phi_y
 
     def _calc_amplitudes(self):
 
@@ -315,6 +331,7 @@ class WaveguideModel:
                 y = self.res.Y_mesh[i, j]
                 field[i, j] = self._field_at_point(x, y)
 
+        # Teste para verificar se a correção funcionou no console
         print("Máximo:", np.max(np.abs(field)))
         print("Mínimo:", np.min(np.abs(field)))
         print("Pontos não nulos:", np.count_nonzero(np.abs(field) > 1e-12))
